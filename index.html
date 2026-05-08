@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes"/>
+<title>FlowSync · Smart Clinic Queue</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Outfit',sans-serif;background:#0A0A0A;color:#F0F0F0;}
+.screen{display:none;min-height:100vh;padding:20px;}
+.screen.active{display:block;}
+.card{background:#1A1A1A;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #333;}
+.btn{width:100%;padding:14px;border-radius:12px;border:none;font-weight:600;cursor:pointer;margin-top:8px;}
+.btn-primary{background:#00C896;color:#000;}
+.btn-danger{background:#FF4757;color:#fff;}
+.btn-secondary{background:#333;color:#fff;}
+input,textarea{width:100%;padding:12px;border-radius:12px;border:1px solid #333;background:#222;color:#fff;margin-bottom:12px;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.token{font-size:48px;font-weight:700;text-align:center;font-family:monospace;}
+.status-badge{padding:8px 16px;border-radius:20px;display:inline-block;font-size:12px;}
+.queue-item{background:#222;padding:12px;border-radius:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin:20px 0;}
+.dot{width:16px;height:16px;border-radius:50%;background:#333;border:2px solid #00C896;}
+.dot.filled{background:#00C896;}
+.loader{text-align:center;padding:40px;}
+.toast{position:fixed;bottom:30px;left:20px;right:20px;background:#333;padding:12px;border-radius:30px;text-align:center;z-index:9999;display:none;}
+.header{display:flex;align-items:center;gap:16px;margin-bottom:20px;}
+.back-btn{font-size:24px;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+
+<!-- HOME SCREEN -->
+<div id="homeScreen" class="screen active">
+  <div style="text-align:center;margin-bottom:30px;">
+    <div style="font-size:48px;margin-bottom:10px;">⚡</div>
+    <h1>FlowSync</h1>
+    <div id="clinicName" style="color:#00C896;margin-top:8px;"></div>
+  </div>
+  
+  <div class="card" style="text-align:center;">
+    <div class="grid">
+      <div><div style="font-size:32px;font-weight:700;color:#00C896" id="onlineCount">0</div><div>🌐 Online</div></div>
+      <div><div style="font-size:32px;font-weight:700;color:#F5A623" id="walkinCount">0</div><div>🚶 Walk-in</div></div>
+    </div>
+  </div>
+
+  <div class="card" onclick="goToScreen('checkinScreen')">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="font-size:28px;">🙋</div>
+      <div><strong>Check In</strong><br><small>Join the queue</small></div>
+    </div>
+  </div>
+
+  <div class="card" onclick="startPin('doctor')">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="font-size:28px;">🩺</div>
+      <div><strong>Doctor Portal</strong><br><small>PIN protected</small></div>
+    </div>
+  </div>
+
+  <div class="card" onclick="startPin('reception')">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="font-size:28px;">📋</div>
+      <div><strong>Receptionist</strong><br><small>Master view</small></div>
+    </div>
+  </div>
+
+  <div id="adminCard" class="card" style="display:none;" onclick="goToScreen('adminScreen')">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="font-size:28px;">⚙️</div>
+      <div><strong>Admin Panel</strong><br><small>Create clinics</small></div>
+    </div>
+  </div>
+</div>
+
+<!-- CHECKIN SCREEN -->
+<div id="checkinScreen" class="screen">
+  <div class="header"><span class="back-btn" onclick="goToScreen('homeScreen')">←</span><h2>Check In</h2></div>
+  <div class="card">
+    <input type="text" id="patientName" placeholder="Full name">
+    <div class="grid">
+      <button class="btn btn-primary" id="onlineBtn" onclick="selectType('online')">🌐 Online</button>
+      <button class="btn btn-secondary" id="walkinBtn" onclick="selectType('walkin')">🚶 Walk-in</button>
+    </div>
+    <button class="btn btn-primary" onclick="checkIn()">Check In →</button>
+  </div>
+</div>
+
+<!-- STATUS SCREEN -->
+<div id="statusScreen" class="screen">
+  <div class="header"><span class="back-btn" onclick="goToScreen('homeScreen')">←</span><h2 id="statusName">Your Status</h2></div>
+  <div class="card" style="text-align:center;">
+    <div class="token" id="tokenDisplay">#---</div>
+    <div id="positionDisplay" style="font-size:24px;margin:16px 0;">--</div>
+    <div id="statusMessage">Waiting...</div>
+  </div>
+</div>
+
+<!-- DOCTOR SCREEN -->
+<div id="doctorScreen" class="screen">
+  <div class="header"><span class="back-btn" onclick="goToScreen('homeScreen')">←</span><h2>Doctor Portal</h2></div>
+  <div class="card">
+    <h3>Now with you</h3>
+    <div id="currentPatientName" style="font-size:20px;margin:8px 0;">—</div>
+    <div id="currentPatientToken" style="color:#888;">—</div>
+    <textarea id="doctorNote" placeholder="Add note for patient" rows="2"></textarea>
+    <div class="grid">
+      <button class="btn btn-primary" onclick="callNextPatient()">✓ Room ready</button>
+      <button class="btn btn-danger" onclick="skipCurrentPatient()">⏭ No-show</button>
+    </div>
+  </div>
+  <div class="card"><h3>Queue</h3><div id="doctorQueue"></div></div>
+</div>
+
+<!-- RECEPTION SCREEN -->
+<div id="receptionScreen" class="screen">
+  <div class="header"><span class="back-btn" onclick="goToScreen('homeScreen')">←</span><h2>Receptionist</h2></div>
+  <div class="card">
+    <div class="grid">
+      <div><div style="font-size:36px;font-weight:700;color:#00C896" id="recOnline">0</div><div>Online</div></div>
+      <div><div style="font-size:36px;font-weight:700;color:#F5A623" id="recWalkin">0</div><div>Walk-in</div></div>
+    </div>
+  </div>
+  <div class="card"><h3>Full Queue</h3><div id="receptionQueue"></div></div>
+</div>
+
+<!-- ADMIN SCREEN -->
+<div id="adminScreen" class="screen">
+  <div class="header"><span class="back-btn" onclick="goToScreen('homeScreen')">←</span><h2>Admin Panel</h2></div>
+  <div class="card">
+    <input type="text" id="newClinicName" placeholder="Clinic name">
+    <input type="text" id="doctorPin" placeholder="Doctor PIN (4 digits)" maxlength="4">
+    <input type="text" id="receptionPin" placeholder="Reception PIN (4 digits)" maxlength="4">
+    <button class="btn btn-primary" onclick="createClinic()">Create Clinic →</button>
+  </div>
+  <div id="clinicList"></div>
+</div>
+
+<script>
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyDJ4GnTbOQYonUYDmDRYPoK-RUQsP3f7Jw",
+  authDomain: "flow-sync-77f0b.firebaseapp.com",
+  projectId: "flow-sync-77f0b",
+  storageBucket: "flow-sync-77f0b.firebasestorage.app",
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let currentClinicId = null;
+let currentPatient = null;
+let selectedType = 'online';
+let currentClinicData = null;
+
+// Helper functions
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => toast.style.display = 'none', 2500);
+}
+
+function goToScreen(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  
+  if (screenId === 'homeScreen' && currentClinicId) {
+    loadPublicQueue();
+  }
+  if (screenId === 'doctorScreen') loadDoctorView();
+  if (screenId === 'receptionScreen') loadReceptionView();
+  if (screenId === 'adminScreen') loadAllClinics();
+}
+
+function selectType(type) {
+  selectedType = type;
+  document.getElementById('onlineBtn').className = type === 'online' ? 'btn btn-primary' : 'btn btn-secondary';
+  document.getElementById('walkinBtn').className = type === 'walkin' ? 'btn btn-primary' : 'btn btn-secondary';
+}
+
+// Get clinic ID from URL
+const urlParams = new URLSearchParams(window.location.search);
+const clinicId = urlParams.get('c');
+if (clinicId) {
+  currentClinicId = clinicId;
+  document.getElementById('clinicName').innerHTML = `📍 Clinic Ready`;
+  loadPublicQueue();
+  // Check for saved patient session
+  const saved = localStorage.getItem(`patient_${clinicId}`);
+  if (saved) {
+    try {
+      currentPatient = JSON.parse(saved);
+      goToScreen('statusScreen');
+      document.getElementById('statusName').innerHTML = currentPatient.name;
+      loadPatientStatus();
+    } catch(e) {}
+  }
+} else {
+  document.getElementById('adminCard').style.display = 'block';
+  document.getElementById('clinicName').innerHTML = `Admin Mode`;
+}
+
+// Load public queue counts
+async function loadPublicQueue() {
+  if (!currentClinicId) return;
+  const queueRef = db.collection('clinics').doc(currentClinicId).collection('queue');
+  const snapshot = await queueRef.where('status', 'in', ['waiting', 'next', 'with-doctor']).get();
+  let online = 0, walkin = 0;
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    if (data.type === 'online') online++;
+    else walkin++;
+  });
+  document.getElementById('onlineCount').innerHTML = online;
+  document.getElementById('walkinCount').innerHTML = walkin;
+}
+
+// Check in patient
+async function checkIn() {
+  const name = document.getElementById('patientName').value.trim();
+  if (!name) { showToast('Enter your name'); return; }
+  if (!currentClinicId) { showToast('No clinic selected'); return; }
+  
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  
+  try {
+    // Get next token number using transaction
+    const clinicRef = db.collection('clinics').doc(currentClinicId);
+    const token = await db.runTransaction(async (t) => {
+      const doc = await t.get(clinicRef);
+      const current = doc.data()?.lastToken || 0;
+      const next = current + 1;
+      t.update(clinicRef, { lastToken: next });
+      return next;
+    });
+    
+    // Create patient entry
+    const patientRef = db.collection('clinics').doc(currentClinicId).collection('queue').doc();
+    await patientRef.set({
+      name: name,
+      token: token,
+      type: selectedType,
+      status: 'waiting',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    currentPatient = { docId: patientRef.id, name: name, token: token };
+    localStorage.setItem(`patient_${currentClinicId}`, JSON.stringify(currentPatient));
+    
+    document.getElementById('statusName').innerHTML = name;
+    document.getElementById('tokenDisplay').innerHTML = `#${token}`;
+    showToast(`Token #${token} assigned!`);
+    goToScreen('statusScreen');
+    loadPatientStatus();
+    loadPublicQueue();
+  } catch (err) {
+    showToast('Error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check In →';
+  }
+}
+
+// Load patient status with real-time listener
+function loadPatientStatus() {
+  if (!currentPatient || !currentClinicId) return;
+  const patientRef = db.collection('clinics').doc(currentClinicId).collection('queue').doc(currentPatient.docId);
+  
+  patientRef.onSnapshot(async (doc) => {
+    if (!doc.exists) return;
+    const data = doc.data();
+    
+    // Get position in queue
+    const queueSnapshot = await db.collection('clinics').doc(currentClinicId).collection('queue')
+      .where('status', 'in', ['waiting', 'next', 'with-doctor']).get();
+    
+    const waiting = [];
+    queueSnapshot.forEach(d => {
+      const p = d.data();
+      if (p.status !== 'done') waiting.push(p.token);
+    });
+    waiting.sort((a,b) => a-b);
+    const position = waiting.indexOf(data.token) + 1;
+    
+    if (data.status === 'with-doctor') {
+      document.getElementById('positionDisplay').innerHTML = '→';
+      document.getElementById('statusMessage').innerHTML = "It's your turn! Please go in.";
+    } else if (data.status === 'done') {
+      document.getElementById('positionDisplay').innerHTML = '✓';
+      document.getElementById('statusMessage').innerHTML = 'Visit complete. Thank you!';
+      localStorage.removeItem(`patient_${currentClinicId}`);
+    } else if (position === 1) {
+      document.getElementById('positionDisplay').innerHTML = '1st';
+      document.getElementById('statusMessage').innerHTML = "You're next! Please be ready.";
+    } else {
+      document.getElementById('positionDisplay').innerHTML = `${position}th`;
+      document.getElementById('statusMessage').innerHTML = `${position-1} person(s) ahead`;
+    }
+    document.getElementById('tokenDisplay').innerHTML = `#${data.token}`;
+  });
+}
+
+// Doctor view
+async function callNextPatient() {
+  if (!currentClinicId) return;
+  const queueRef = db.collection('clinics').doc(currentClinicId).collection('queue');
+  
+  await db.runTransaction(async (t) => {
+    const snapshot = await t.get(queueRef.where('status', 'in', ['with-doctor', 'next', 'waiting']).limit(20));
+    const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    
+    const current = docs.find(d => d.status === 'with-doctor');
+    if (current) t.update(queueRef.doc(current.id), { status: 'done' });
+    
+    const waiting = docs.filter(d => d.status !== 'with-doctor' && d.status !== 'done')
+      .sort((a,b) => a.token - b.token);
+    const next = waiting[0];
+    if (next) t.update(queueRef.doc(next.id), { status: 'with-doctor' });
+  });
+  showToast('Queue updated');
+  loadDoctorView();
+}
+
+async function skipCurrentPatient() {
+  if (!currentClinicId) return;
+  const queueRef = db.collection('clinics').doc(currentClinicId).collection('queue');
+  const snapshot = await queueRef.where('status', '==', 'with-doctor').limit(1).get();
+  snapshot.forEach(async doc => {
+    await doc.ref.update({ status: 'skipped' });
+    showToast('Patient skipped');
+    callNextPatient();
+  });
+}
+
+async function loadDoctorView() {
+  if (!currentClinicId) return;
+  const queueRef = db.collection('clinics').doc(currentClinicId).collection('queue');
+  const snapshot = await queueRef.where('status', 'in', ['waiting', 'next', 'with-doctor']).orderBy('token').get();
+  
+  const patients = [];
+  let current = null;
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    if (data.status === 'with-doctor') current = data;
+    else patients.push(data);
+  });
+  
+  document.getElementById('currentPatientName').innerHTML = current ? current.name : '—';
+  document.getElementById('currentPatientToken').innerHTML = current ? `Token #${current.token}` : 'No patient';
+  
+  const queueHtml = patients.map(p => `<div class="queue-item"><span>#${p.token} ${p.name}</span><span style="color:#888;">${p.type}</span></div>`).join('');
+  document.getElementById('doctorQueue').innerHTML = queueHtml || '<div class="loader">Queue empty</div>';
+}
+
+// Reception view
+async function loadReceptionView() {
+  if (!currentClinicId) return;
+  const queueRef = db.collection('clinics').doc(currentClinicId).collection('queue');
+  const snapshot = await queueRef.where('status', 'in', ['waiting', 'next', 'with-doctor', 'skipped']).orderBy('token').get();
+  
+  let online = 0, walkin = 0;
+  const patients = [];
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    if (data.type === 'online') online++;
+    else walkin++;
+    patients.push(data);
+  });
+  
+  document.getElementById('recOnline').innerHTML = online;
+  document.getElementById('recWalkin').innerHTML = walkin;
+  
+  const queueHtml = patients.map(p => `<div class="queue-item"><span>#${p.token} ${p.name}</span><span style="color:#888;">${p.type} (${p.status})</span></div>`).join('');
+  document.getElementById('receptionQueue').innerHTML = queueHtml || '<div class="loader">Queue empty</div>';
+}
+
+// PIN functions
+let pinMode = '';
+let pinBuffer = '';
+
+function startPin(role) {
+  pinMode = role;
+  pinBuffer = '';
+  const pin = prompt(`Enter ${role === 'doctor' ? 'Doctor' : 'Receptionist'} PIN:`);
+  if (pin === (role === 'doctor' ? '1111' : '2222')) {
+    goToScreen(role === 'doctor' ? 'doctorScreen' : 'receptionScreen');
+  } else {
+    showToast('Wrong PIN');
+  }
+}
+
+// Admin functions
+async function createClinic() {
+  const name = document.getElementById('newClinicName').value.trim();
+  const dpin = document.getElementById('doctorPin').value.trim();
+  const rpin = document.getElementById('receptionPin').value.trim();
+  
+  if (!name || !dpin || !rpin) { showToast('Fill all fields'); return; }
+  if (dpin.length !== 4 || rpin.length !== 4) { showToast('PINs must be 4 digits'); return; }
+  
+  const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).slice(2, 6);
+  
+  await db.collection('clinics').doc(id).set({
+    name: name,
+    doctorPin: dpin,
+    receptionPin: rpin,
+    lastToken: 0,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  
+  const link = `${window.location.origin}${window.location.pathname}?c=${id}`;
+  showToast('Clinic created!');
+  prompt('Copy this link to share:', link);
+  
+  document.getElementById('newClinicName').value = '';
+  document.getElementById('doctorPin').value = '';
+  document.getElementById('receptionPin').value = '';
+  loadAllClinics();
+}
+
+async function loadAllClinics() {
+  const snapshot = await db.collection('clinics').get();
+  const clinics = [];
+  snapshot.forEach(doc => clinics.push({ id: doc.id, ...doc.data() }));
+  const html = clinics.map(c => `<div class="card"><strong>${c.name || c.id}</strong><br><small style="color:#888;">${window.location.origin}${window.location.pathname}?c=${c.id}</small><br><small>Doctor PIN: ${c.doctorPin} | Reception: ${c.receptionPin}</small></div>`).join('');
+  document.getElementById('clinicList').innerHTML = html || '<div class="loader">No clinics</div>';
+}
+
+// Live refresh
+setInterval(() => {
+  if (document.getElementById('homeScreen').classList.contains('active')) loadPublicQueue();
+  if (document.getElementById('doctorScreen').classList.contains('active')) loadDoctorView();
+  if (document.getElementById('receptionScreen').classList.contains('active')) loadReceptionView();
+}, 3000);
+</script>
+</body>
+</html>
