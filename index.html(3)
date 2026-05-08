@@ -1,0 +1,294 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0D2B1A">
+<title>FlowSync · Multilingual Clinic Queue</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --primary: #0D9488;
+  --primary-dark: #0F766E;
+  --primary-light: #14B8A6;
+  --primary-bg: rgba(13, 148, 136, 0.08);
+  --secondary: #F59E0B;
+  --secondary-bg: rgba(245, 158, 11, 0.08);
+  --danger: #EF4444;
+  --danger-bg: rgba(239, 68, 68, 0.08);
+  --info: #3B82F6;
+  --info-bg: rgba(59, 130, 246, 0.08);
+  --success: #10B981;
+  --gold: #FBBF24;
+  --bg-primary: #09090B;
+  --bg-secondary: #18181B;
+  --bg-tertiary: #27272A;
+  --bg-card: #18181B;
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
+  --border: #27272A;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --shadow-glow: 0 0 0 2px rgba(13, 148, 136, 0.3);
+}
+
+[data-theme="light"] {
+  --bg-primary: #F4F4F5;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #E4E4E7;
+  --bg-card: #FFFFFF;
+  --text-primary: #18181B;
+  --text-secondary: #52525B;
+  --text-muted: #71717A;
+  --border: #E4E4E7;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.screen { display: none; min-height: 100vh; flex-direction: column; }
+.screen.active { display: flex; }
+
+#loader {
+  position: fixed; inset: 0; background: var(--bg-primary);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 10000; gap: 20px;
+}
+.loader-spinner { width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.header {
+  position: sticky; top: 0; z-index: 100; background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border); padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.back-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.container { padding: 16px; flex: 1; max-width: 600px; margin: 0 auto; width: 100%; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 16px; }
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-card { background: var(--bg-tertiary); border-radius: var(--radius-md); padding: 16px; text-align: center; }
+.stat-value { font-size: 32px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.btn { padding: 12px 20px; border: none; border-radius: var(--radius-md); font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.15s; text-align: center; }
+.btn-primary { background: var(--primary); color: white; }
+.btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border); }
+.btn-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+.btn-warning { background: var(--secondary-bg); color: var(--secondary); border: 1px solid var(--secondary); }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.live-queue { background: var(--bg-tertiary); border-radius: var(--radius-lg); margin-bottom: 20px; overflow: hidden; }
+.live-queue-header { padding: 16px; background: var(--primary-bg); display: flex; justify-content: space-between; align-items: center; }
+.live-dot { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: pulse 1.5s infinite; display: inline-block; margin-right: 6px; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.5} }
+.current-token { padding: 20px; text-align: center; background: var(--bg-secondary); margin: 12px; border-radius: var(--radius-md); }
+.current-token-value { font-size: 48px; font-weight: 700; font-family: monospace; color: var(--primary); }
+.portal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; margin-bottom: 12px; }
+.portal-icon { width: 52px; height: 52px; border-radius: var(--radius-md); background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.type-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.type-option { padding: 16px; background: var(--bg-tertiary); border: 2px solid var(--border); border-radius: var(--radius-md); text-align: center; cursor: pointer; }
+.type-option.selected { border-color: var(--primary); background: var(--primary-bg); }
+.form-input { width: 100%; padding: 12px 14px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); font-family: inherit; }
+.toast { position: fixed; bottom: 80px; left: 16px; right: 16px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 16px; text-align: center; z-index: 9999; opacity: 0; transform: translateY(20px); transition: all 0.3s; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateY(0); }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: none; align-items: flex-end; backdrop-filter: blur(4px); }
+.modal.open { display: flex; }
+.modal-content { background: var(--bg-secondary); border-radius: var(--radius-xl) var(--radius-xl) 0 0; padding: 24px; width: 100%; max-width: 500px; margin: 0 auto; }
+.lang-selector { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 16px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); }
+.lang-btn { padding: 6px 12px; border-radius: 20px; background: var(--bg-tertiary); border: none; color: var(--text-secondary); font-size: 12px; cursor: pointer; }
+.lang-btn.active { background: var(--primary); color: white; }
+.queue-item { background: var(--bg-tertiary); border-radius: var(--radius-md); padding: 14px; display: flex; align-items: center; gap: 12px; margin-bottom: 8px; cursor: pointer; }
+.token-badge { width: 44px; height: 44px; border-radius: var(--radius-md); background: var(--primary-bg); display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: monospace; }
+.pin-dots { display: flex; justify-content: center; gap: 16px; margin: 24px 0; }
+.pin-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--bg-tertiary); border: 2px solid var(--border); }
+.pin-dot.filled { background: var(--primary); border-color: var(--primary); }
+.pin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+.pin-key { padding: 18px; background: var(--bg-tertiary); border-radius: var(--radius-md); text-align: center; font-size: 24px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="loader"><div class="loader-spinner"></div><div style="font-size:18px;font-weight:600;">FlowSync</div><div id="loaderMsg" style="font-size:13px;color:var(--text-muted);">Initializing...</div></div>
+<div id="toast" class="toast"></div>
+
+<!-- Language Selector -->
+<div class="lang-selector" id="langSelector">
+  <button class="lang-btn" data-lang="en">🇬🇧 English</button>
+  <button class="lang-btn" data-lang="mr">🇮🇳 मराठी</button>
+  <button class="lang-btn" data-lang="ur">🇵🇰 اردو</button>
+  <button class="lang-btn" data-lang="hi">🇮🇳 हिन्दी</button>
+</div>
+
+<!-- HOME SCREEN -->
+<div id="homeScreen" class="screen active">
+  <div class="container">
+    <div style="text-align:center; margin-bottom:24px;"><div style="font-size:48px;">⚡</div><h1 style="font-size:28px;">FlowSync</h1><p id="homeClinicName" style="font-size:13px;color:var(--text-muted);"></p></div>
+    <div class="live-queue">
+      <div class="live-queue-header"><span><span class="live-dot"></span> <span id="liveLabel">Live Queue</span></span><span id="queueTimestamp" style="font-size:12px;"></span></div>
+      <div class="current-token"><div class="current-token-label" id="currentLabel">Now with Doctor</div><div class="current-token-value" id="currentTokenDisplay">—</div></div>
+      <div class="stats-grid"><div class="stat-card"><div class="stat-value" id="previewOnline" style="color:var(--primary);">0</div><div class="stat-label" id="onlineLabel">🌐 Online</div></div><div class="stat-card"><div class="stat-value" id="previewWalkin" style="color:var(--secondary);">0</div><div class="stat-label" id="walkinLabel">🚶 Walk-in</div></div></div>
+    </div>
+    <div class="portal-card" onclick="goToCheckin()"><div class="portal-icon">🙋</div><div class="portal-info"><h3 id="checkinTitle">Check In</h3><p id="checkinSub">Join the queue online or as walk-in</p></div><div style="margin-left:auto;">→</div></div>
+    <div class="portal-card" onclick="startPin('doctor')"><div class="portal-icon">🩺</div><div class="portal-info"><h3 id="doctorTitle">Doctor Portal</h3><p id="doctorSub">PIN protected · Manage consultations</p></div><div style="margin-left:auto;">→</div></div>
+    <div class="portal-card" onclick="startPin('reception')"><div class="portal-icon">📋</div><div class="portal-info"><h3 id="receptionTitle">Reception Desk</h3><p id="receptionSub">Full queue control & patient management</p></div><div style="margin-left:auto;">→</div></div>
+    <div id="adminPortal" class="portal-card" style="display:none;" onclick="goToAdmin()"><div class="portal-icon">⚙️</div><div class="portal-info"><h3 id="adminTitle">Admin Panel</h3><p id="adminSub">Create and manage clinics</p></div><div style="margin-left:auto;">→</div></div>
+  </div>
+</div>
+
+<!-- CHECKIN SCREEN -->
+<div id="checkinScreen" class="screen">
+  <div class="header"><div class="back-btn" onclick="goBack()">←</div><div class="header-title"><h1 id="checkinHeader">Check In</h1><p id="checkinHeaderSub">Join the queue</p></div></div>
+  <div class="container"><div class="card">
+    <div class="type-selector"><div class="type-option" id="onlineTypeOpt" onclick="selectCheckinType('online')"><i>🌐</i><div id="onlineTypeLabel">Online</div><div style="font-size:10px;" id="onlineTypeDesc">Join from home</div></div><div class="type-option" id="walkinTypeOpt" onclick="selectCheckinType('walkin')"><i>🚶</i><div id="walkinTypeLabel">Walk-in</div><div style="font-size:10px;" id="walkinTypeDesc">At clinic now</div></div></div>
+    <div class="form-group"><label class="form-label" id="nameLabel">Full Name</label><input type="text" class="form-input" id="checkinName" placeholder="Enter patient name"></div>
+    <div class="form-group"><label class="form-label" id="phoneLabel">Mobile Number (optional)</label><input type="tel" class="form-input" id="checkinPhone" placeholder="10-digit number"></div>
+    <button class="btn btn-primary" style="width:100%;" id="checkinBtn" onclick="processCheckin()">Check In →</button>
+  </div></div>
+</div>
+
+<!-- STATUS SCREEN -->
+<div id="statusScreen" class="screen">
+  <div class="header"><div class="back-btn" onclick="goBack()">←</div><div class="header-title"><h1 id="statusName">Your Status</h1><p><span class="live-dot"></span> <span id="liveUpdatesLabel">Live updates</span></p></div></div>
+  <div class="container"><div class="card" style="text-align:center;"><div class="token-display"><div class="token-value" id="statusToken">#---</div><div class="token-label" id="yourTokenLabel">Your Token</div></div><div id="statusPosition" style="font-size:36px;font-weight:700;margin:16px 0;">—</div><div id="statusMessage" style="color:var(--text-muted);">Waiting in queue...</div></div></div>
+</div>
+
+<!-- DOCTOR SCREEN (simplified - real-time works) -->
+<div id="doctorScreen" class="screen"><div class="header"><div class="back-btn" onclick="goBack()">←</div><div class="header-title"><h1 id="docHeader">Doctor Portal</h1><p><span class="live-dot"></span> <span id="liveControlLabel">Live control</span></p></div></div><div class="container"><div class="card"><div class="card-title" id="nowWithYouLabel">Now with you</div><div id="docCurName" style="font-size:20px;font-weight:600;">—</div><div class="grid-2" style="margin-top:12px;"><button class="btn btn-primary" onclick="callNextPatient()" id="roomReadyBtn">✓ Room ready</button><button class="btn btn-danger" onclick="skipCurrentPatient()" id="noShowBtn">⏭ No-show</button></div></div><div class="card"><div id="queueListDoc" class="queue-list"><div class="empty-state">Loading...</div></div></div></div></div>
+
+<!-- RECEPTION SCREEN -->
+<div id="receptionScreen" class="screen"><div class="header"><div class="back-btn" onclick="goBack()">←</div><div class="header-title"><h1 id="recHeader">Receptionist</h1><p><span class="live-dot"></span> <span id="masterViewLabel">Master view</span></p></div></div><div class="container"><div class="stats-grid"><div class="stat-card"><div class="stat-value" id="recOnline">0</div><div class="stat-label" id="recOnlineLabel">Online</div></div><div class="stat-card"><div class="stat-value" id="recWalkin">0</div><div class="stat-label" id="recWalkinLabel">Walk-in</div></div></div><div class="card"><div class="grid-2"><button class="btn btn-primary" onclick="callNextPatient()" id="recCallBtn">✓ Call next</button><button class="btn btn-secondary" onclick="openAddPatientModal()" id="recAddBtn">＋ Add patient</button></div></div><div id="queueListRec" class="queue-list"></div></div></div>
+
+<!-- ADMIN SCREEN -->
+<div id="adminScreen" class="screen"><div class="header"><div class="back-btn" onclick="goBack()">←</div><div class="header-title"><h1 id="adminHeader">Admin Panel</h1><p id="adminSubHeader">Manage clinics</p></div></div><div class="container"><div class="card"><div class="form-group"><label class="form-label" id="clinicNameLabel">Clinic name</label><input class="form-input" id="ncName" placeholder="Dr. Mehta Clinic"></div><div class="grid-2"><div class="form-group"><label class="form-label" id="doctorPinLabel">Doctor PIN</label><input class="form-input" id="ncDpin" placeholder="1234" maxlength="4"></div><div class="form-group"><label class="form-label" id="receptionPinLabel">Reception PIN</label><input class="form-input" id="ncRpin" placeholder="5678" maxlength="4"></div></div><button class="btn btn-primary" id="createClinicBtn" onclick="createClinic()">Generate clinic link →</button></div><div id="clinicList"></div></div></div>
+
+<script>
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyDJ4GnTbOQYonUYDmDRYPoK-RUQsP3f7Jw",
+  authDomain: "flow-sync-77f0b.firebaseapp.com",
+  databaseURL: "https://flow-sync-77f0b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "flow-sync-77f0b",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const ADMIN_PIN = "6026";
+
+// Translations
+const translations = {
+  en: { liveLabel:"Live Queue", currentLabel:"Now with Doctor", onlineLabel:"🌐 Online", walkinLabel:"🚶 Walk-in", checkinTitle:"Check In", checkinSub:"Join the queue", doctorTitle:"Doctor Portal", doctorSub:"PIN protected", receptionTitle:"Reception Desk", receptionSub:"Full control", adminTitle:"Admin Panel", adminSub:"Create clinics", checkinHeader:"Check In", nameLabel:"Full Name", phoneLabel:"Mobile Number", yourTokenLabel:"Your Token", liveUpdatesLabel:"Live updates", roomReadyBtn:"✓ Room ready", noShowBtn:"⏭ No-show", recCallBtn:"✓ Call next", recAddBtn:"＋ Add patient", onlineTypeLabel:"Online", walkinTypeLabel:"Walk-in", nowWithYouLabel:"Now with you", masterViewLabel:"Master view", liveControlLabel:"Live control", clinicNameLabel:"Clinic name", doctorPinLabel:"Doctor PIN", receptionPinLabel:"Reception PIN", adminHeader:"Admin Panel", adminSubHeader:"Manage clinics", recOnlineLabel:"Online", recWalkinLabel:"Walk-in" },
+  mr: { liveLabel:"लाइव्ह रांग", currentLabel:"डॉक्टरकडे आत्ता", onlineLabel:"🌐 ऑनलाइन", walkinLabel:"🚶 थेट आलेले", checkinTitle:"नोंदणी करा", checkinSub:"रांगेत सामील व्हा", doctorTitle:"डॉक्टर पोर्टल", doctorSub:"पिन संरक्षित", receptionTitle:"रिसेप्शन", receptionSub:"पूर्ण नियंत्रण", adminTitle:"प्रशासन", adminSub:"क्लिनिक तयार करा", checkinHeader:"नोंदणी", nameLabel:"पूर्ण नाव", phoneLabel:"मोबाईल क्रमांक", yourTokenLabel:"तुमचे टोकन", liveUpdatesLabel:"लाइव्ह अपडेट्स", roomReadyBtn:"✓ खोली तयार", noShowBtn:"⏭ गैरहजर", recCallBtn:"✓ पुढील बोलवा", recAddBtn:"＋ रुग्ण जोडा", onlineTypeLabel:"ऑनलाइन", walkinTypeLabel:"थेट", nowWithYouLabel:"आत्ता तुमच्याकडे", masterViewLabel:"मुख्य दृश्य", liveControlLabel:"लाइव्ह नियंत्रण", clinicNameLabel:"क्लिनिकचे नाव", doctorPinLabel:"डॉक्टर पिन", receptionPinLabel:"रिसेप्शन पिन", adminHeader:"प्रशासन पॅनेल", adminSubHeader:"क्लिनिक व्यवस्थापित करा", recOnlineLabel:"ऑनलाइन", recWalkinLabel:"थेट" },
+  ur: { liveLabel:"لائیو قطار", currentLabel:"اب ڈاکٹر کے پاس", onlineLabel:"🌐 آن لائن", walkinLabel:"🚶 واک ان", checkinTitle:"چیک ان", checkinSub:"قطار میں شامل ہوں", doctorTitle:"ڈاکٹر پورٹل", doctorSub:"پن سے محفوظ", receptionTitle:"ریسپشن", receptionSub:"مکمل کنٹرول", adminTitle:"ایڈمن", adminSub:"کلینک بنائیں", checkinHeader:"چیک ان", nameLabel:"مکمل نام", phoneLabel:"موبائل نمبر", yourTokenLabel:"آپ کا ٹوکن", liveUpdatesLabel:"لائیو اپ ڈیٹس", roomReadyBtn:"✓ کمرہ تیار", noShowBtn:"⏭ غیر حاضر", recCallBtn:"✓ اگلا بلائیں", recAddBtn:"＋ مریض شامل کریں", onlineTypeLabel:"آن لائن", walkinTypeLabel:"واک ان", nowWithYouLabel:"اب آپ کے پاس", masterViewLabel:"مین منظر", liveControlLabel:"لائیو کنٹرول", clinicNameLabel:"کلینک کا نام", doctorPinLabel:"ڈاکٹر پن", receptionPinLabel:"ریسپشن پن", adminHeader:"ایڈمن پینل", adminSubHeader:"کلینک منظم کریں", recOnlineLabel:"آن لائن", recWalkinLabel:"واک ان" },
+  hi: { liveLabel:"लाइव कतार", currentLabel:"अब डॉक्टर के पास", onlineLabel:"🌐 ऑनलाइन", walkinLabel:"🚶 वॉक-इन", checkinTitle:"चेक इन", checkinSub:"कतार में शामिल हों", doctorTitle:"डॉक्टर पोर्टल", doctorSub:"पिन सुरक्षित", receptionTitle:"रिसेप्शन", receptionSub:"पूर्ण नियंत्रण", adminTitle:"एडमिन", adminSub:"क्लिनिक बनाएं", checkinHeader:"चेक इन", nameLabel:"पूरा नाम", phoneLabel:"मोबाइल नंबर", yourTokenLabel:"आपका टोकन", liveUpdatesLabel:"लाइव अपडेट", roomReadyBtn:"✓ कमरा तैयार", noShowBtn:"⏭ अनुपस्थित", recCallBtn:"✓ अगला बुलाएं", recAddBtn:"＋ मरीज जोड़ें", onlineTypeLabel:"ऑनलाइन", walkinTypeLabel:"वॉक-इन", nowWithYouLabel:"अब आपके पास", masterViewLabel:"मुख्य दृश्य", liveControlLabel:"लाइव नियंत्रण", clinicNameLabel:"क्लिनिक का नाम", doctorPinLabel:"डॉक्टर पिन", receptionPinLabel:"रिसेप्शन पिन", adminHeader:"एडमिन पैनल", adminSubHeader:"क्लिनिक प्रबंधित करें", recOnlineLabel:"ऑनलाइन", recWalkinLabel:"वॉक-इन" }
+};
+let currentLang = "en";
+function updateTexts() { const t = translations[currentLang]; for(let key in t) { let el = document.getElementById(key); if(el) el.innerText = t[key]; else { let els = document.querySelectorAll(`[data-i18n="${key}"]`); els.forEach(e=>e.innerText=t[key]); } } document.querySelectorAll(".lang-btn").forEach(btn=>btn.classList.toggle("active", btn.dataset.lang===currentLang)); }
+function setLang(lang) { currentLang = lang; updateTexts(); localStorage.setItem("flowsync_lang", lang); }
+document.querySelectorAll(".lang-btn").forEach(btn=>btn.addEventListener("click",()=>setLang(btn.dataset.lang)));
+
+let clinicId = null, clinicData = null, currentPatient = null, selectedType = "online", pinMode = "", pinBuffer = "";
+function showToast(msg) { let t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2500); }
+function goBack() { document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active")); document.getElementById("homeScreen").classList.add("active"); refreshHomePreview(); }
+function goToScreen(id) { document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active")); document.getElementById(id).classList.add("active"); }
+function goToCheckin() { selectedType="online"; document.getElementById("onlineTypeOpt").classList.add("selected"); document.getElementById("walkinTypeOpt").classList.remove("selected"); document.getElementById("checkinName").value=""; document.getElementById("checkinPhone").value=""; goToScreen("checkinScreen"); }
+function selectCheckinType(type) { selectedType=type; document.getElementById("onlineTypeOpt").classList.toggle("selected",type==="online"); document.getElementById("walkinTypeOpt").classList.toggle("selected",type==="walkin"); }
+
+const urlParams = new URLSearchParams(window.location.search);
+clinicId = urlParams.get("c");
+
+async function init() {
+  let savedLang = localStorage.getItem("flowsync_lang");
+  if(savedLang && translations[savedLang]) currentLang = savedLang;
+  updateTexts();
+  if(!clinicId) {
+    document.getElementById("adminPortal").style.display = "flex";
+    document.getElementById("homeClinicName").innerHTML = "Admin Dashboard";
+    document.getElementById("loader").style.display = "none";
+    loadAllClinics();
+    return;
+  }
+  try {
+    let snap = await db.ref(`clinics/${clinicId}`).get();
+    if(!snap.exists()) { document.getElementById("loaderMsg").innerText="Clinic not found"; setTimeout(()=>document.getElementById("loader").style.display="none",2000); return; }
+    clinicData = snap.val();
+    document.getElementById("homeClinicName").innerHTML = clinicData.name;
+    document.getElementById("loader").style.display = "none";
+    let savedToken = localStorage.getItem(`token_${clinicId}`);
+    if(savedToken) { currentPatient = { token: parseInt(savedToken) }; goToScreen("statusScreen"); loadPatientStatus(); }
+    refreshHomePreview();
+    startRealtimeUpdates();
+  } catch(e) { document.getElementById("loaderMsg").innerText="Connection error"; setTimeout(()=>document.getElementById("loader").style.display="none",2000); }
+}
+
+async function refreshHomePreview() {
+  if(!clinicId) return;
+  let snap = await db.ref(`queues/${clinicId}`).get();
+  if(!snap.exists()) { document.getElementById("previewOnline").innerText="0"; document.getElementById("previewWalkin").innerText="0"; document.getElementById("currentTokenDisplay").innerText="—"; return; }
+  let online=0, walkin=0, currentToken=null;
+  snap.forEach(c=>{ let p=c.val(); if(p.status!=="done"){ if(p.type==="online") online++; else walkin++; if(p.status==="with-doctor") currentToken=p.token; } });
+  document.getElementById("previewOnline").innerHTML = online;
+  document.getElementById("previewWalkin").innerHTML = walkin;
+  document.getElementById("currentTokenDisplay").innerHTML = currentToken ? `#${currentToken}` : "—";
+  document.getElementById("queueTimestamp").innerHTML = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+
+function startRealtimeUpdates() { if(!clinicId) return; db.ref(`queues/${clinicId}`).on("value",()=>{ if(document.getElementById("homeScreen").classList.contains("active")) refreshHomePreview(); if(document.getElementById("doctorScreen").classList.contains("active")) loadDoctorQueue(); if(document.getElementById("receptionScreen").classList.contains("active")) loadReceptionQueue(); }); }
+
+async function processCheckin() {
+  let name = document.getElementById("checkinName").value.trim();
+  if(!name) { showToast("Please enter your name"); return; }
+  let btn = document.getElementById("checkinBtn");
+  btn.disabled = true; btn.innerText = "Processing...";
+  try {
+    let counterRef = db.ref(`counters/${clinicId}`);
+    let token; await counterRef.transaction(cur=>{ token=(cur||0)+1; return token; });
+    let queueSnap = await db.ref(`queues/${clinicId}`).get();
+    let hasDoctor=false; queueSnap.forEach(c=>{ if(c.val().status==="with-doctor") hasDoctor=true; });
+    let status = !hasDoctor ? "next" : "waiting";
+    await db.ref(`queues/${clinicId}`).push({ name, token, type:selectedType, status, createdAt:Date.now() });
+    localStorage.setItem(`token_${clinicId}`, token);
+    currentPatient = { token, name };
+    document.getElementById("statusName").innerHTML = name;
+    document.getElementById("statusToken").innerHTML = `#${token}`;
+    showToast(`Token #${token} assigned!`);
+    goToScreen("statusScreen");
+    loadPatientStatus();
+    refreshHomePreview();
+  } catch(e) { showToast("Error: "+e.message); }
+  finally { btn.disabled=false; btn.innerText=translations[currentLang].checkinHeader+" →"; }
+}
+
+function loadPatientStatus() { if(!currentPatient||!clinicId) return; db.ref(`queues/${clinicId}`).on("value",(snap)=>{ if(!snap.exists()) return; let all=[]; snap.forEach(c=>all.push({...c.val(),key:c.key})); let myData=all.find(p=>p.token===currentPatient.token); if(!myData) return; let waiting=all.filter(p=>p.status==="waiting"||p.status==="next"); waiting.sort((a,b)=>a.token-b.token); let pos=waiting.findIndex(p=>p.token===currentPatient.token)+1; if(myData.status==="with-doctor"){ document.getElementById("statusPosition").innerHTML="→"; document.getElementById("statusMessage").innerHTML=translations[currentLang].currentLabel; } else if(myData.status==="done"){ document.getElementById("statusPosition").innerHTML="✓"; document.getElementById("statusMessage").innerHTML="Visit complete. Thank you!"; localStorage.removeItem(`token_${clinicId}`); } else if(pos===1){ document.getElementById("statusPosition").innerHTML="1st"; document.getElementById("statusMessage").innerHTML="You're next! Please be ready."; } else { document.getElementById("statusPosition").innerHTML=`${pos}`; document.getElementById("statusMessage").innerHTML=`${pos-1} person(s) ahead`; } }); }
+
+async function callNextPatient() { if(!clinicId) return; let queueRef=db.ref(`queues/${clinicId}`); await queueRef.transaction(data=>{ if(!data) return; let entries=Object.entries(data).map(([k,v])=>({...v,key:k})); let current=entries.find(e=>e.status==="with-doctor"); if(current) data[current.key].status="done"; let waiting=entries.filter(e=>e.status==="waiting"||e.status==="next").sort((a,b)=>a.token-b.token); if(waiting[0]) data[waiting[0].key].status="with-doctor"; return data; }); showToast("Queue updated"); }
+async function skipCurrentPatient() { if(!clinicId) return; let snap=await db.ref(`queues/${clinicId}`).get(); let current=null, currentKey=null; snap.forEach(c=>{ if(c.val().status==="with-doctor"){ current=c.val(); currentKey=c.key; } }); if(currentKey) await db.ref(`queues/${clinicId}/${currentKey}`).update({status:"skipped"}); callNextPatient(); showToast("Patient skipped"); }
+async function loadDoctorQueue() { if(!clinicId) return; let snap=await db.ref(`queues/${clinicId}`).get(); let patients=[]; snap.forEach(c=>patients.push({...c.val(),key:c.key})); let current=patients.find(p=>p.status==="with-doctor"); let waiting=patients.filter(p=>p.status==="waiting"||p.status==="next").sort((a,b)=>a.token-b.token); document.getElementById("docCurName").innerHTML=current?current.name:"—"; let html=waiting.map(p=>`<div class="queue-item"><div class="token-badge">${p.token}</div><div><strong>${p.name}</strong><div style="font-size:11px;">${p.type}</div></div></div>`).join(""); document.getElementById("queueListDoc").innerHTML=html||'<div class="empty-state">Queue empty</div>'; }
+async function loadReceptionQueue() { if(!clinicId) return; let snap=await db.ref(`queues/${clinicId}`).get(); let online=0,walkin=0,patients=[]; snap.forEach(c=>{ let p=c.val(); if(p.status!=="done"){ if(p.type==="online") online++; else walkin++; patients.push(p); } }); document.getElementById("recOnline").innerHTML=online; document.getElementById("recWalkin").innerHTML=walkin; let html=patients.map(p=>`<div class="queue-item"><div class="token-badge">${p.token}</div><div><strong>${p.name}</strong><div style="font-size:11px;">${p.type} · ${p.status}</div></div></div>`).join(""); document.getElementById("queueListRec").innerHTML=html||'<div class="empty-state">Queue empty</div>'; }
+function openAddPatientModal() { let name=prompt(translations[currentLang].nameLabel+":"); if(name) addManualPatient(name); }
+async function addManualPatient(name) { let counterRef=db.ref(`counters/${clinicId}`); let token; await counterRef.transaction(cur=>{ token=(cur||0)+1; return token; }); await db.ref(`queues/${clinicId}`).push({ name, token, type:"walkin", status:"waiting", addedByStaff:true, createdAt:Date.now() }); showToast(`${name} added with token #${token}`); }
+function startPin(role){ pinMode=role; pinBuffer=""; showPinPad(); }
+function showPinPad(){ let html=`<div class="header"><div class="back-btn" onclick="document.querySelector('#pinModal').remove()">←</div><div class="header-title"><h1>Enter PIN</h1><p>${pinMode} access</p></div></div><div class="container"><div class="card"><div class="pin-dots" id="pinDots"></div><div class="pin-grid" id="pinGrid"></div><div id="pinError" style="color:var(--danger);text-align:center;margin-top:16px;"></div></div></div>`; let modal=document.createElement("div"); modal.id="pinModal"; modal.className="screen active"; modal.style.position="fixed"; modal.style.inset="0"; modal.style.background="var(--bg-primary)"; modal.style.zIndex="2000"; modal.innerHTML=html; document.body.appendChild(modal); for(let i=1;i<=9;i++){ let btn=document.createElement("div"); btn.className="pin-key"; btn.innerText=i; btn.onclick=()=>addPinDigit(i.toString()); document.getElementById("pinGrid").appendChild(btn); } let zero=document.createElement("div"); zero.className="pin-key"; zero.innerText="0"; zero.onclick=()=>addPinDigit("0"); document.getElementById("pinGrid").appendChild(zero); let del=document.createElement("div"); del.className="pin-key"; del.innerHTML="⌫"; del.onclick=deletePinDigit; document.getElementById("pinGrid").appendChild(del); let cls=document.createElement("div"); cls.className="pin-key"; cls.innerHTML="C"; cls.onclick=clearPin; document.getElementById("pinGrid").appendChild(cls); function addPinDigit(d){ if(pinBuffer.length>=4) return; pinBuffer+=d; updatePinDots(); if(pinBuffer.length===4) verifyPin(); } function deletePinDigit(){ pinBuffer=pinBuffer.slice(0,-1); updatePinDots(); } function clearPin(){ pinBuffer=""; updatePinDots(); document.getElementById("pinError").innerText=""; } function updatePinDots(){ let dots=document.querySelectorAll("#pinDots .pin-dot"); if(!dots.length) for(let i=0;i<4;i++){ let d=document.createElement("div"); d.className="pin-dot"; document.getElementById("pinDots").appendChild(d); } dots=document.querySelectorAll("#pinDots .pin-dot"); dots.forEach((d,i)=>d.classList.toggle("filled",i<pinBuffer.length)); } async function verifyPin(){ let expected=null; if(pinMode==="admin") expected=ADMIN_PIN; else if(pinMode==="doctor") expected=clinicData?.doctorPin; else expected=clinicData?.receptionPin; if(pinBuffer===expected){ modal.remove(); if(pinMode==="doctor"){ goToScreen("doctorScreen"); loadDoctorQueue(); } else if(pinMode==="reception"){ goToScreen("receptionScreen"); loadReceptionQueue(); } else goToScreen("adminScreen"); } else { document.getElementById("pinError").innerText="Incorrect PIN"; pinBuffer=""; updatePinDots(); } } updatePinDots(); }
+function goToAdmin(){ pinMode="admin"; pinBuffer=""; showPinPad(); }
+async function createClinic(){ let name=document.getElementById("ncName").value.trim(); let dpin=document.getElementById("ncDpin").value.trim(); let rpin=document.getElementById("ncRpin").value.trim(); if(!name||!dpin||!rpin){ showToast("Fill all fields"); return; } let id=name.toLowerCase().replace(/[^a-z0-9]/g,'-')+"-"+Math.random().toString(36).slice(2,6); await db.ref(`clinics/${id}`).set({ name, doctorPin:dpin, receptionPin:rpin, lastToken:0, createdAt:Date.now() }); let link=`${location.origin}${location.pathname}?c=${id}`; showToast("Clinic created!"); prompt("Copy clinic link:", link); document.getElementById("ncName").value=""; document.getElementById("ncDpin").value=""; document.getElementById("ncRpin").value=""; loadAllClinics(); }
+async function loadAllClinics(){ let snap=await db.ref("clinics").get(); if(!snap.exists()){ document.getElementById("clinicList").innerHTML='<div class="empty-state">No clinics</div>'; return; } let html=""; snap.forEach(c=>{ let data=c.val(); let link=`${location.origin}${location.pathname}?c=${c.key}`; html+=`<div class="card" style="cursor:pointer" onclick="navigator.clipboard.writeText('${link}');showToast('Copied!')"><strong>${data.name}</strong><br><small style="color:var(--text-muted);">${link}</small><br><small>Doctor PIN: ${data.doctorPin} | Reception: ${data.receptionPin}</small></div>`; }); document.getElementById("clinicList").innerHTML=html; }
+init();
+window.goBack=goBack; window.goToCheckin=goToCheckin; window.startPin=startPin; window.selectCheckinType=selectCheckinType; window.processCheckin=processCheckin; window.callNextPatient=callNextPatient; window.skipCurrentPatient=skipCurrentPatient; window.openAddPatientModal=openAddPatientModal; window.createClinic=createClinic; window.goToAdmin=goToAdmin;
+</script>
+</body>
+</html>
+```
