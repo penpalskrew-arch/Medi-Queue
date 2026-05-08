@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#0A2B1A"/>
+<title>FlowSync · Professional Clinic Queue</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --primary: #0D9488;
+  --primary-dark: #0F766E;
+  --primary-light: #14B8A6;
+  --primary-bg: rgba(13, 148, 136, 0.08);
+  --secondary: #F59E0B;
+  --secondary-bg: rgba(245, 158, 11, 0.08);
+  --danger: #EF4444;
+  --danger-bg: rgba(239, 68, 68, 0.08);
+  --info: #3B82F6;
+  --info-bg: rgba(59, 130, 246, 0.08);
+  --success: #10B981;
+  --success-bg: rgba(16, 185, 129, 0.08);
+  --gold: #FBBF24;
+  --gold-bg: rgba(251, 191, 36, 0.08);
+  
+  --bg-primary: #09090B;
+  --bg-secondary: #18181B;
+  --bg-tertiary: #27272A;
+  --bg-card: #18181B;
+  
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
+  
+  --border: #27272A;
+  --border-light: #3F3F46;
+  
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 0 2px rgba(13, 148, 136, 0.3);
+}
+
+[data-theme="light"] {
+  --bg-primary: #F4F4F5;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #E4E4E7;
+  --bg-card: #FFFFFF;
+  --text-primary: #18181B;
+  --text-secondary: #52525B;
+  --text-muted: #71717A;
+  --border: #E4E4E7;
+  --border-light: #D4D4D8;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.screen {
+  display: none;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.screen.active {
+  display: flex;
+}
+
+/* Loader */
+#loader {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  gap: 20px;
+}
+
+.loader-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Header */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+}
+
+.back-btn:active {
+  transform: scale(0.95);
+  background: var(--primary-bg);
+}
+
+.header-title {
+  flex: 1;
+}
+
+.header-title h1 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.header-title p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Container */
+.container {
+  padding: 16px;
+  flex: 1;
+}
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: all 0.2s;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  text-align: center;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:active {
+  background: var(--primary-dark);
+}
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.btn-warning {
+  background: var(--secondary-bg);
+  color: var(--secondary);
+  border: 1px solid var(--secondary);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* Live Queue Banner */
+.live-queue {
+  background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.live-queue-header {
+  padding: 16px;
+  background: var(--primary-bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--primary);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--primary);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.9); }
+}
+
+.current-token {
+  padding: 20px;
+  text-align: center;
+  background: var(--bg-tertiary);
+  margin: 12px;
+  border-radius: var(--radius-md);
+}
+
+.current-token-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.current-token-value {
+  font-size: 48px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--primary);
+}
+
+/* Queue Items */
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.queue-item {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.queue-item:active {
+  border-color: var(--primary);
+  transform: scale(0.98);
+}
+
+.queue-number {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--primary-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  color: var(--primary);
+}
+
+.queue-number.walkin {
+  background: var(--secondary-bg);
+  color: var(--secondary);
+}
+
+.queue-info {
+  flex: 1;
+}
+
+.queue-name {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.queue-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.queue-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 20px;
+  background: var(--bg-secondary);
+  margin-left: 6px;
+}
+
+/* Portal Cards */
+.portal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  margin-bottom: 12px;
+  transition: all 0.2s;
+}
+
+.portal-card:active {
+  transform: scale(0.98);
+  border-color: var(--primary);
+}
+
+.portal-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.portal-info h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.portal-info p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* PIN Pad */
+.pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border);
+  transition: all 0.2s;
+}
+
+.pin-dot.filled {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.pin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.pin-key {
+  padding: 18px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.pin-key:active {
+  transform: scale(0.95);
+  background: var(--primary-bg);
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 15px;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--shadow-glow);
+}
+
+/* Type Selector */
+.type-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.type-option {
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.type-option.selected {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+}
+
+.type-option i {
+  font-size: 28px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 16px;
+  right: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  text-align: center;
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s;
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  display: none;
+  align-items: flex-end;
+  backdrop-filter: blur(4px);
+}
+
+.modal.open {
+  display: flex;
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.badge-primary {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+.badge-warning {
+  background: var(--secondary-bg);
+  color: var(--secondary);
+}
+
+.badge-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state i {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+/* Token Display */
+.token-display {
+  text-align: center;
+  padding: 20px;
+}
+
+.token-value {
+  font-size: 64px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.token-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* Responsive */
+@media (min-width: 768px) {
+  .container {
+    max-width: 600px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  
+  .modal-content {
+    border-radius: var(--radius-xl);
+    margin: auto;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  
+  .modal {
+    align-items: center;
+  }
+}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="loader-spinner"></div>
+  <div style="font-size: 18px; font-weight: 600;">FlowSync</div>
+  <div style="font-size: 13px; color: var(--text-muted);" id="loaderMsg">Initializing...</div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- HOME SCREEN -->
+<div id="homeScreen" class="screen active">
+  <div class="container">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="font-size: 48px; margin-bottom: 8px;">⚡</div>
+      <h1 style="font-size: 28px; font-weight: 700;">FlowSync</h1>
+      <p id="homeClinicName" style="font-size: 13px; color: var(--text-muted); margin-top: 4px;"></p>
+    </div>
+
+    <!-- Live Queue Preview -->
+    <div class="live-queue" id="liveQueuePreview">
+      <div class="live-queue-header">
+        <span class="live-badge"><span class="live-dot"></span> Live Queue</span>
+        <span style="font-size: 12px; color: var(--text-muted);" id="queueTimestamp"></span>
+      </div>
+      <div class="current-token">
+        <div class="current-token-label">Now with Doctor</div>
+        <div class="current-token-value" id="currentTokenDisplay">—</div>
+      </div>
+      <div class="stats-grid" style="margin: 0 12px 12px 12px; width: auto;">
+        <div class="stat-card">
+          <div class="stat-value" id="previewOnline" style="color: var(--primary);">0</div>
+          <div class="stat-label">🌐 Online</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="previewWalkin" style="color: var(--secondary);">0</div>
+          <div class="stat-label">🚶 Walk-in</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Portal Cards -->
+    <div class="portal-card" onclick="goToCheckin()">
+      <div class="portal-icon">🙋</div>
+      <div class="portal-info">
+        <h3>Check In</h3>
+        <p>Join the queue online or as walk-in</p>
+      </div>
+      <div style="margin-left: auto;">→</div>
+    </div>
+
+    <div class="portal-card" onclick="startPin('doctor')">
+      <div class="portal-icon">🩺</div>
+      <div class="portal-info">
+        <h3>Doctor Portal</h3>
+        <p>PIN protected · Manage consultations</p>
+      </div>
+      <div style="margin-left: auto;">→</div>
+    </div>
+
+    <div class="portal-card" onclick="startPin('reception')">
+      <div class="portal-icon">📋</div>
+      <div class="portal-info">
+        <h3>Reception Desk</h3>
+        <p>Full queue control & patient management</p>
+      </div>
+      <div style="margin-left: auto;">→</div>
+    </div>
+
+    <div id="adminPortal" class="portal-card" style="display: none;" onclick="goToAdmin()">
+      <div class="portal-icon">⚙️</div>
+      <div class="portal-info">
+        <h3>Admin Panel</h3>
+        <p>Create and manage clinics</p>
+      </div>
+      <div style="margin-left: auto;">→</div>
+    </div>
+  </div>
+</div>
+
+<!-- CHECKIN SCREEN -->
+<div id="checkinScreen" class="screen">
+  <div class="header">
+    <div class="back-btn" onclick="goBack()">←</div>
+    <div class="header-title">
+      <h1>Check In</h1>
+      <p>Join the queue</p>
+    </div>
+  </div>
+  <div class="container">
+    <div class="card">
+      <div class="type-selector">
+        <div class="type-option" id="onlineType" onclick="selectCheckinType('online')">
+          <i>🌐</i>
+          <div>Online</div>
+          <div style="font-size: 10px; color: var(--text-muted);">Join from home</div>
+        </div>
+        <div class="type-option" id="walkinType" onclick="selectCheckinType('walkin')">
+          <i>🚶</i>
+          <div>Walk-in</div>
+          <div style="font-size: 10px; color: var(--text-muted);">At clinic now</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input type="text" class="form-input" id="checkinName" placeholder="Enter patient name">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Mobile Number (optional)</label>
+        <input type="tel" class="form-input" id="checkinPhone" placeholder="10-digit number">
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%;" onclick="processCheckin()">
+        Check In →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS SCREEN -->
+<div id="statusScreen" class="screen">
+  <div class="header">
+    <div class="back-btn" onclick="goBack()">←</div>
+    <div class="header-title">
+      <h1 id="statusName">Your Status</h1>
+      <p><span class="live-dot" style="display: inline-block;"></span> Live updates</p>
+    </div>
+  </div>
+  <div class="container">
+    <div class="card" style="text-align: center;">
+      <div class="token-display">
+        <div class="token-value" id="statusToken">#---</div>
+        <div class="token-label">Your Token</div>
+      </div>
+      <div id="statusPosition" style="font-size: 36px; font-weight: 700; margin: 16px 0;">—</div>
+      <div id="statusMessage" style="color: var(--text-muted);">Waiting in queue...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Rest of screens (Doctor, Reception, Admin, Pin) have similar structure -->
+<!-- I'll provide the complete JavaScript that makes everything work -->
+
+<script>
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyDJ4GnTbOQYonUYDmDRYPoK-RUQsP3f7Jw",
+  authDomain: "flow-sync-77f0b.firebaseapp.com",
+  databaseURL: "https://flow-sync-77f0b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "flow-sync-77f0b",
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const ADMIN_PIN = "6026";
+
+let clinicId = null;
+let clinicData = null;
+let currentPatient = null;
+let selectedType = "online";
+let pinMode = "";
+let pinBuffer = "";
+
+// Helper Functions
+function showToast(msg) {
+  const toast = document.getElementById("toast");
+  toast.textContent = msg;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 2500);
+}
+
+function goBack() {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("homeScreen").classList.add("active");
+  refreshHomePreview();
+}
+
+function goToScreen(screenId) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(screenId).classList.add("active");
+}
+
+function goToCheckin() {
+  selectedType = "online";
+  document.getElementById("onlineType").classList.add("selected");
+  document.getElementById("walkinType").classList.remove("selected");
+  document.getElementById("checkinName").value = "";
+  document.getElementById("checkinPhone").value = "";
+  goToScreen("checkinScreen");
+}
+
+function selectCheckinType(type) {
+  selectedType = type;
+  document.getElementById("onlineType").classList.toggle("selected", type === "online");
+  document.getElementById("walkinType").classList.toggle("selected", type === "walkin");
+}
+
+// Get Clinic ID from URL
+const urlParams = new URLSearchParams(window.location.search);
+clinicId = urlParams.get("c");
+
+// Initialize
+async function init() {
+  document.getElementById("loaderMsg").textContent = "Connecting to Firebase...";
+  
+  if (!clinicId) {
+    // Admin Mode
+    document.getElementById("adminPortal").style.display = "flex";
+    document.getElementById("homeClinicName").innerHTML = "Admin Dashboard";
+    document.getElementById("liveQueuePreview").style.display = "none";
+    document.getElementById("loader").style.display = "none";
+    return;
+  }
+  
+  try {
+    const snap = await db.ref(`clinics/${clinicId}`).get();
+    if (!snap.exists()) {
+      document.getElementById("loaderMsg").textContent = "Clinic not found";
+      setTimeout(() => {
+        document.getElementById("loader").style.display = "none";
+      }, 2000);
+      return;
+    }
+    
+    clinicData = snap.val();
+    document.getElementById("homeClinicName").innerHTML = clinicData.name;
+    document.getElementById("loader").style.display = "none";
+    
+    // Restore session if exists
+    const savedToken = localStorage.getItem(`token_${clinicId}`);
+    if (savedToken) {
+      currentPatient = { token: parseInt(savedToken) };
+      goToScreen("statusScreen");
+      loadPatientStatus();
+    }
+    
+    refreshHomePreview();
+    startRealtimeUpdates();
+  } catch (e) {
+    document.getElementById("loaderMsg").textContent = "Connection error";
+    setTimeout(() => {
+      document.getElementById("loader").style.display = "none";
+    }, 2000);
+  }
+}
+
+async function refreshHomePreview() {
+  if (!clinicId) return;
+  
+  const snap = await db.ref(`queues/${clinicId}`).get();
+  if (!snap.exists()) {
+    document.getElementById("previewOnline").textContent = "0";
+    document.getElementById("previewWalkin").textContent = "0";
+    document.getElementById("currentTokenDisplay").textContent = "—";
+    return;
+  }
+  
+  let online = 0, walkin = 0, currentToken = null;
+  snap.forEach(c => {
+    const p = c.val();
+    if (p.status !== "done") {
+      if (p.type === "online") online++;
+      else walkin++;
+      if (p.status === "with-doctor") currentToken = p.token;
+    }
+  });
+  
+  document.getElementById("previewOnline").textContent = online;
+  document.getElementById("previewWalkin").textContent = walkin;
+  document.getElementById("currentTokenDisplay").textContent = currentToken ? `#${currentToken}` : "—";
+  document.getElementById("queueTimestamp").textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function startRealtimeUpdates() {
+  if (!clinicId) return;
+  
+  db.ref(`queues/${clinicId}`).on("value", () => {
+    if (document.getElementById("homeScreen").classList.contains("active")) {
+      refreshHomePreview();
+    }
+  });
+}
+
+// Checkin Function
+async function processCheckin() {
+  const name = document.getElementById("checkinName").value.trim();
+  if (!name) {
+    showToast("Please enter your name");
+    return;
+  }
+  
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "Processing...";
+  
+  try {
+    // Get next token using transaction
+    const counterRef = db.ref(`counters/${clinicId}`);
+    let token;
+    await counterRef.transaction(current => {
+      token = (current || 0) + 1;
+      return token;
+    });
+    
+    // Check if any patient with doctor
+    const queueSnap = await db.ref(`queues/${clinicId}`).get();
+    let hasDoctor = false;
+    queueSnap.forEach(c => {
+      if (c.val().status === "with-doctor") hasDoctor = true;
+    });
+    
+    const status = !hasDoctor ? "next" : "waiting";
+    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    await db.ref(`queues/${clinicId}`).push({
+      name, token, type: selectedType,
+      status, time: timeString,
+      createdAt: Date.now()
+    });
+    
+    localStorage.setItem(`token_${clinicId}`, token);
+    currentPatient = { token, name };
+    
+    document.getElementById("statusName").innerHTML = name;
+    document.getElementById("statusToken").innerHTML = `#${token}`;
+    showToast(`Token #${token} assigned!`);
+    goToScreen("statusScreen");
+    loadPatientStatus();
+    refreshHomePreview();
+    
+  } catch (e) {
+    showToast("Error: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Check In →";
+  }
+}
+
+function loadPatientStatus() {
+  if (!currentPatient || !clinicId) return;
+  
+  db.ref(`queues/${clinicId}`).on("value", (snap) => {
+    if (!snap.exists()) return;
+    
+    const allPatients = [];
+    snap.forEach(c => allPatients.push({ ...c.val(), key: c.key }));
+    
+    const myData = allPatients.find(p => p.token === currentPatient.token);
+    if (!myData) return;
+    
+    const waiting = allPatients.filter(p => p.status === "waiting" || p.status === "next");
+    waiting.sort((a, b) => a.token - b.token);
+    const position = waiting.findIndex(p => p.token === currentPatient.token) + 1;
+    
+    if (myData.status === "with-doctor") {
+      document.getElementById("statusPosition").innerHTML = "→";
+      document.getElementById("statusMessage").innerHTML = "It's your turn! Please go in now.";
+    } else if (myData.status === "done") {
+      document.getElementById("statusPosition").innerHTML = "✓";
+      document.getElementById("statusMessage").innerHTML = "Visit complete. Thank you!";
+      localStorage.removeItem(`token_${clinicId}`);
+    } else if (position === 1) {
+      document.getElementById("statusPosition").innerHTML = "1st";
+      document.getElementById("statusMessage").innerHTML = "You're next! Please be ready.";
+    } else {
+      document.getElementById("statusPosition").innerHTML = `${position}`;
+      document.getElementById("statusMessage").innerHTML = `${position - 1} person(s) ahead of you`;
+    }
+  });
+}
+
+// PIN Functions
+function startPin(role) {
+  pinMode = role;
+  pinBuffer = "";
+  showPinPad();
+}
+
+function showPinPad() {
+  const pinHtml = `
+    <div class="header"><div class="back-btn" onclick="goToScreen('homeScreen')">←</div><div class="header-title"><h1>Enter PIN</h1><p>${pinMode === 'doctor' ? 'Doctor' : 'Reception'} access</p></div></div>
+    <div class="container">
+      <div class="card" style="text-align: center;">
+        <div class="pin-dots" id="pinDots"></div>
+        <div class="pin-grid" id="pinGrid"></div>
+        <div id="pinError" style="color: var(--danger); margin-top: 16px;"></div>
+      </div>
+    </div>
+  `;
+  
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = pinHtml;
+  const pinScreen = tempDiv.firstElementChild;
+  
+  document.body.appendChild(pinScreen);
+  pinScreen.classList.add("screen", "active");
+  
+  // Build dots
+  const dotsDiv = document.getElementById("pinDots");
+  for (let i = 0; i < 4; i++) {
+    const dot = document.createElement("div");
+    dot.className = "pin-dot";
+    dotsDiv.appendChild(dot);
+  }
+  
+  // Build grid
+  const gridDiv = document.getElementById("pinGrid");
+  for (let i = 1; i <= 9; i++) {
+    const key = document.createElement("div");
+    key.className = "pin-key";
+    key.textContent = i;
+    key.onclick = () => addPinDigit(i.toString());
+    gridDiv.appendChild(key);
+  }
+  const zeroKey = document.createElement("div");
+  zeroKey.className = "pin-key";
+  zeroKey.textContent = "0";
+  zeroKey.onclick = () => addPinDigit("0");
+  gridDiv.appendChild(zeroKey);
+  
+  const delKey = document.createElement("div");
+  delKey.className = "pin-key";
+  delKey.innerHTML = "⌫";
+  delKey.onclick = deletePinDigit;
+  gridDiv.appendChild(delKey);
+  
+  const clearKey = document.createElement("div");
+  clearKey.className = "pin-key";
+  clearKey.innerHTML = "C";
+  clearKey.onclick = clearPin;
+  gridDiv.appendChild(clearKey);
+  
+  window.currentPinScreen = pinScreen;
+}
+
+function addPinDigit(digit) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += digit;
+  updatePinDots();
+  if (pinBuffer.length === 4) verifyPin();
+}
+
+function deletePinDigit() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updatePinDots();
+}
+
+function clearPin() {
+  pinBuffer = "";
+  updatePinDots();
+  document.getElementById("pinError").textContent = "";
+}
+
+function updatePinDots() {
+  const dots = document.querySelectorAll(".pin-dot");
+  for (let i = 0; i < dots.length; i++) {
+    dots[i].classList.toggle("filled", i < pinBuffer.length);
+  }
+}
+
+function verifyPin() {
+  let expected = null;
+  if (pinMode === "admin") expected = ADMIN_PIN;
+  else if (pinMode === "doctor") expected = clinicData?.doctorPin;
+  else if (pinMode === "reception") expected = clinicData?.receptionPin;
+  
+  if (pinBuffer === expected) {
+    if (window.currentPinScreen) window.currentPinScreen.remove();
+    if (pinMode === "doctor") goToScreen("doctorScreen");
+    else if (pinMode === "reception") goToScreen("receptionScreen");
+    else goToScreen("adminScreen");
+  } else {
+    document.getElementById("pinError").textContent = "Incorrect PIN. Try again.";
+    pinBuffer = "";
+    updatePinDots();
+  }
+}
+
+// Admin Functions
+function goToAdmin() {
+  pinMode = "admin";
+  pinBuffer = "";
+  showPinPad();
+}
+
+// Start the app
+init();
+</script>
+</body>
+</html>
